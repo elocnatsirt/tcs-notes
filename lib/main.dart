@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-void main() {
+void main() async {
+  await Hive.initFlutter();
+  var notesBox = await Hive.openBox('notesBox');
+  notesBox.putAll({
+    'My Note': 'This is my first note',
+  });
   runApp(MaterialApp(
     title: 'TC\'s Notes',
     home: MyApp(),
   ));
 }
 
-final fakeNotes = List<Note>.generate(
-  20,
-  (i) => Note(
-    'Note $i',
-    'Body of note $i',
-  ),
-);
-
 class MyApp extends StatelessWidget {
+  final notesBox = Hive.box('notesBox');
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -27,20 +27,22 @@ class MyApp extends StatelessWidget {
         ),
         body: Center(
           child: ListView.builder(
-              itemCount: fakeNotes.length,
+              itemCount: notesBox.length,
               itemBuilder: (context, index) {
+                var fullNote = Note(notesBox.keyAt(index).toString(),
+                    notesBox.get(notesBox.keyAt(index)).toString());
                 return Slidable(
                   actionPane: SlidableDrawerActionPane(),
                   child: ListTile(
-                    title: Text('${fakeNotes[index].title}'),
-                    subtitle: Text('${fakeNotes[index].body}'),
+                    title: Text(notesBox.keyAt(index).toString()),
+                    subtitle:
+                        Text(notesBox.get(notesBox.keyAt(index)).toString()),
                     leading: Icon(Icons.note, size: 56),
                     onTap: () {
                       Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) =>
-                                  ViewNote(note: fakeNotes[index])));
+                              builder: (context) => ViewNote(note: fullNote)));
                     },
                   ),
                   secondaryActions: [
@@ -50,6 +52,11 @@ class MyApp extends StatelessWidget {
                         icon: Icons.edit,
                         onTap: () {
                           print('editing list tile');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => NoteForm(note: fullNote)),
+                          );
                         }),
                     IconSlideAction(
                         caption: 'Delete',
@@ -57,6 +64,13 @@ class MyApp extends StatelessWidget {
                         icon: Icons.delete,
                         onTap: () {
                           print('deleting list tile');
+                          notesBox.delete(notesBox.keyAt(index));
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MyApp(),
+                            ),
+                          );
                         }),
                   ],
                 );
@@ -102,6 +116,8 @@ class ViewNote extends StatelessWidget {
 
 // Add Note Form Widget
 class NoteForm extends StatefulWidget {
+  final Note note;
+  NoteForm({Key key, this.note}) : super(key: key);
   @override
   AddNote createState() {
     return AddNote();
@@ -110,9 +126,25 @@ class NoteForm extends StatefulWidget {
 
 class AddNote extends State<NoteForm> {
   final _formKey = GlobalKey<FormState>();
+  var noteTitleController = TextEditingController();
+  var noteBodyController = TextEditingController();
+  final notesBox = Hive.box('notesBox');
 
   @override
+  void dispose() {
+    // Clean up the controller when the widget is disposed.
+    noteTitleController.dispose();
+    noteBodyController.dispose();
+    super.dispose();
+  }
+
   Widget build(BuildContext context) {
+    if (widget.note != null) {
+      noteTitleController =
+          TextEditingController(text: widget.note.title.toString());
+      noteBodyController =
+          TextEditingController(text: widget.note.body.toString());
+    }
     return Scaffold(
         appBar: AppBar(
           title: Text("New Note"),
@@ -132,6 +164,7 @@ class AddNote extends State<NoteForm> {
                       height: 16,
                     ),
                     TextFormField(
+                      controller: noteTitleController,
                       validator: (value) {
                         if (value.isEmpty) {
                           return 'Please enter a name for your note';
@@ -150,6 +183,7 @@ class AddNote extends State<NoteForm> {
                       height: 16,
                     ),
                     TextFormField(
+                        controller: noteBodyController,
                         validator: (value) {
                           if (value.isEmpty) {
                             return 'Please enter a body for your note';
@@ -175,7 +209,14 @@ class AddNote extends State<NoteForm> {
               FlatButton(
                 onPressed: () {
                   if (_formKey.currentState.validate()) {
-                    Navigator.pop(context);
+                    notesBox.put(
+                        noteTitleController.text, noteBodyController.text);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MyApp(),
+                      ),
+                    );
                   }
                 },
                 child: Container(
