@@ -6,9 +6,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 void main() async {
   await Hive.initFlutter();
   var notesBox = await Hive.openBox('notesBox');
-  notesBox.putAll({
-    'My Note': 'This is my first note',
-  });
+  if (notesBox.length < 1) {
+    notesBox.putAll({
+      'My Note': 'This is my first note!',
+    });
+  }
   runApp(MaterialApp(
     title: 'TC\'s Notes',
     home: MyApp(),
@@ -20,6 +22,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'TC\'s Notes',
       home: Scaffold(
         appBar: AppBar(
@@ -31,12 +34,17 @@ class MyApp extends StatelessWidget {
               itemBuilder: (context, index) {
                 var fullNote = Note(notesBox.keyAt(index).toString(),
                     notesBox.get(notesBox.keyAt(index)).toString());
+                var previewText =
+                    notesBox.get(notesBox.keyAt(index)).toString();
+                if (previewText.length > 25) {
+                  previewText =
+                      previewText.replaceRange(25, previewText.length, '...');
+                }
                 return Slidable(
                   actionPane: SlidableDrawerActionPane(),
                   child: ListTile(
                     title: Text(notesBox.keyAt(index).toString()),
-                    subtitle:
-                        Text(notesBox.get(notesBox.keyAt(index)).toString()),
+                    subtitle: Text(previewText),
                     leading: Icon(Icons.note, size: 56),
                     onTap: () {
                       Navigator.push(
@@ -106,9 +114,44 @@ class ViewNote extends StatelessWidget {
   ViewNote({Key key, @required this.note}) : super(key: key);
   @override
   Widget build(BuildContext context) {
+    void handleClick(String value) {
+      switch (value) {
+        case 'Edit':
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => NoteForm(note: note)),
+          );
+          break;
+        case 'Delete':
+          print('deleting list tile');
+          var notesBox = Hive.box('notesBox');
+          notesBox.delete(note.title);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MyApp(),
+            ),
+          );
+          break;
+      }
+    }
+
     return Scaffold(
         appBar: AppBar(
           title: Text(note.title),
+          actions: <Widget>[
+            PopupMenuButton<String>(
+              onSelected: handleClick,
+              itemBuilder: (BuildContext context) {
+                return {'Edit', 'Delete'}.map((String choice) {
+                  return PopupMenuItem<String>(
+                    value: choice,
+                    child: Text(choice),
+                  );
+                }).toList();
+              },
+            ),
+          ],
         ),
         body: Text(note.body));
   }
@@ -129,6 +172,7 @@ class AddNote extends State<NoteForm> {
   var noteTitleController = TextEditingController();
   var noteBodyController = TextEditingController();
   final notesBox = Hive.box('notesBox');
+  var pageTitle = Text("New Note");
 
   @override
   void dispose() {
@@ -144,10 +188,11 @@ class AddNote extends State<NoteForm> {
           TextEditingController(text: widget.note.title.toString());
       noteBodyController =
           TextEditingController(text: widget.note.body.toString());
+      pageTitle = Text("Edit Note");
     }
     return Scaffold(
         appBar: AppBar(
-          title: Text("New Note"),
+          title: pageTitle,
         ),
         body: Center(
             child: Container(
@@ -167,14 +212,17 @@ class AddNote extends State<NoteForm> {
                       controller: noteTitleController,
                       validator: (value) {
                         if (value.isEmpty) {
-                          return 'Please enter a name for your note';
+                          return 'Please enter a name for your note.';
+                        } else if (widget.note == null &&
+                            notesBox.get(value) != null) {
+                          return 'A note with this name already exists!\nPlease rename your note.';
                         }
                         return null;
                       },
                       decoration: InputDecoration(
                         prefixIcon: Icon(Icons.star),
                         border: OutlineInputBorder(),
-                        hintText: 'Enter the name of your note',
+                        hintText: 'Enter the name of your note.',
                         isDense: true,
                         contentPadding: EdgeInsets.all(10),
                       ),
@@ -186,7 +234,7 @@ class AddNote extends State<NoteForm> {
                         controller: noteBodyController,
                         validator: (value) {
                           if (value.isEmpty) {
-                            return 'Please enter a body for your note';
+                            return 'Please enter a body for your note.';
                           }
                           return null;
                         },
@@ -211,6 +259,12 @@ class AddNote extends State<NoteForm> {
                   if (_formKey.currentState.validate()) {
                     notesBox.put(
                         noteTitleController.text, noteBodyController.text);
+                    print(noteTitleController.text);
+                    if (widget.note != null &&
+                        noteTitleController.text !=
+                            widget.note.title.toString()) {
+                      notesBox.delete(widget.note.title.toString());
+                    }
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
