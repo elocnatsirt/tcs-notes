@@ -22,81 +22,92 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'TC\'s Notes',
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('TC\'s Notes'),
-        ),
-        body: Center(
-          child: ListView.builder(
-              itemCount: notesBox.length,
-              itemBuilder: (context, index) {
-                var fullNote = Note(notesBox.keyAt(index).toString(),
-                    notesBox.get(notesBox.keyAt(index)).toString());
-                var previewText =
-                    notesBox.get(notesBox.keyAt(index)).toString();
-                if (previewText.length > 25) {
-                  previewText =
-                      previewText.replaceRange(25, previewText.length, '...');
-                }
-                return Slidable(
-                  actionPane: SlidableDrawerActionPane(),
-                  child: ListTile(
-                    title: Text(notesBox.keyAt(index).toString()),
-                    subtitle: Text(previewText),
-                    leading: Icon(Icons.note, size: 56),
-                    onTap: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => ViewNote(note: fullNote)));
-                    },
-                  ),
-                  secondaryActions: [
-                    IconSlideAction(
-                        caption: 'Edit',
-                        color: Colors.blue,
-                        icon: Icons.edit,
-                        onTap: () {
-                          print('editing list tile');
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => NoteForm(note: fullNote)),
-                          );
-                        }),
-                    IconSlideAction(
-                        caption: 'Delete',
-                        color: Colors.red,
-                        icon: Icons.delete,
-                        onTap: () {
-                          print('deleting list tile');
-                          notesBox.delete(notesBox.keyAt(index));
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => MyApp(),
-                            ),
-                          );
-                        }),
-                  ],
-                );
-              }),
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(
+        debugShowCheckedModeBanner: false,
+        title: 'TC\'s Notes',
+        home: WillPopScope(
+          onWillPop: () {
+            return Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => NoteForm()),
+              MaterialPageRoute(
+                builder: (context) => MyApp(),
+              ),
             );
           },
-          tooltip: 'Add Note',
-          label: Text('New Note'),
-          icon: Icon(Icons.note_add),
-        ),
-      ),
-    );
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text('TC\'s Notes'),
+            ),
+            body: Center(
+              child: ListView.builder(
+                  itemCount: notesBox.length,
+                  itemBuilder: (context, index) {
+                    var fullNote = Note(notesBox.keyAt(index).toString(),
+                        notesBox.get(notesBox.keyAt(index)).toString());
+                    var previewText =
+                        notesBox.get(notesBox.keyAt(index)).toString();
+                    if (previewText.length > 25) {
+                      previewText = previewText.replaceRange(
+                          25, previewText.length, '...');
+                    }
+                    return Slidable(
+                      actionPane: SlidableDrawerActionPane(),
+                      child: ListTile(
+                        title: Text(notesBox.keyAt(index).toString()),
+                        subtitle: Text(previewText),
+                        leading: Icon(Icons.note, size: 56),
+                        onTap: () {
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      ViewNote(note: fullNote)));
+                        },
+                      ),
+                      secondaryActions: [
+                        IconSlideAction(
+                            caption: 'Edit',
+                            color: Colors.blue,
+                            icon: Icons.edit,
+                            onTap: () {
+                              print('editing list tile');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        NoteForm(note: fullNote)),
+                              );
+                            }),
+                        IconSlideAction(
+                            caption: 'Delete',
+                            color: Colors.red,
+                            icon: Icons.delete,
+                            onTap: () {
+                              print('deleting list tile');
+                              notesBox.delete(notesBox.keyAt(index));
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MyApp(),
+                                ),
+                              );
+                            }),
+                      ],
+                    );
+                  }),
+            ),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => NoteForm()),
+                );
+              },
+              tooltip: 'Add Note',
+              label: Text('New Note'),
+              icon: Icon(Icons.note_add),
+            ),
+          ),
+        ));
   }
 }
 
@@ -136,24 +147,33 @@ class ViewNote extends StatelessWidget {
       }
     }
 
-    return Scaffold(
-        appBar: AppBar(
-          title: Text(note.title),
-          actions: <Widget>[
-            PopupMenuButton<String>(
-              onSelected: handleClick,
-              itemBuilder: (BuildContext context) {
-                return {'Edit', 'Delete'}.map((String choice) {
-                  return PopupMenuItem<String>(
-                    value: choice,
-                    child: Text(choice),
-                  );
-                }).toList();
-              },
+    return WillPopScope(
+        onWillPop: () {
+          return Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MyApp(),
             ),
-          ],
-        ),
-        body: Text(note.body));
+          );
+        },
+        child: Scaffold(
+            appBar: AppBar(
+              title: Text(note.title),
+              actions: <Widget>[
+                PopupMenuButton<String>(
+                  onSelected: handleClick,
+                  itemBuilder: (BuildContext context) {
+                    return {'Edit', 'Delete'}.map((String choice) {
+                      return PopupMenuItem<String>(
+                        value: choice,
+                        child: Text(choice),
+                      );
+                    }).toList();
+                  },
+                ),
+              ],
+            ),
+            body: Text(note.body)));
   }
 }
 
@@ -190,101 +210,110 @@ class AddNote extends State<NoteForm> {
           TextEditingController(text: widget.note.body.toString());
       pageTitle = Text("Edit Note");
     }
-    return Scaffold(
-        appBar: AppBar(
-          title: pageTitle,
-        ),
-        body: Center(
-            child: Container(
-                child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              Container(
-                constraints: BoxConstraints(minWidth: 300, maxWidth: 960),
-                width: MediaQuery.of(context).size.width * 0.8,
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 16,
-                    ),
-                    TextFormField(
-                      controller: noteTitleController,
-                      validator: (value) {
-                        if (value.isEmpty) {
-                          return 'Please enter a name for your note.';
-                        } else if (widget.note == null &&
-                            notesBox.get(value) != null) {
-                          return 'A note with this name already exists!\nPlease rename your note.';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.star),
-                        border: OutlineInputBorder(),
-                        hintText: 'Enter the name of your note.',
-                        isDense: true,
-                        contentPadding: EdgeInsets.all(10),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 16,
-                    ),
-                    TextFormField(
-                        controller: noteBodyController,
-                        validator: (value) {
-                          if (value.isEmpty) {
-                            return 'Please enter a body for your note.';
-                          }
-                          return null;
-                        },
-                        decoration: InputDecoration(
-                          prefixIcon: Icon(Icons.note_add),
-                          border: OutlineInputBorder(),
-                          hintText: 'Write your note',
-                          isDense: true,
-                          contentPadding: EdgeInsets.all(10),
-                        ),
-                        maxLines: null,
-                        keyboardType: TextInputType.multiline,
-                        minLines: 4),
-                  ],
-                ),
-              ),
-              SizedBox(
-                height: 16,
-              ),
-              FlatButton(
-                onPressed: () {
-                  if (_formKey.currentState.validate()) {
-                    notesBox.put(
-                        noteTitleController.text, noteBodyController.text);
-                    print(noteTitleController.text);
-                    if (widget.note != null &&
-                        noteTitleController.text !=
-                            widget.note.title.toString()) {
-                      notesBox.delete(widget.note.title.toString());
-                    }
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MyApp(),
-                      ),
-                    );
-                  }
-                },
+    return WillPopScope(
+        onWillPop: () {
+          return Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MyApp(),
+            ),
+          );
+        },
+        child: Scaffold(
+            appBar: AppBar(
+              title: pageTitle,
+            ),
+            body: Center(
                 child: Container(
-                    color: Colors.green,
-                    width: 300,
-                    height: 100,
-                    child: Center(
-                        child: Text(
-                      'Save Note',
-                      style: TextStyle(fontSize: 25),
-                    ))),
+                    child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  Container(
+                    constraints: BoxConstraints(minWidth: 300, maxWidth: 960),
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 16,
+                        ),
+                        TextFormField(
+                          controller: noteTitleController,
+                          validator: (value) {
+                            if (value.isEmpty) {
+                              return 'Please enter a name for your note.';
+                            } else if (widget.note == null &&
+                                notesBox.get(value) != null) {
+                              return 'A note with this name already exists!\nPlease rename your note.';
+                            }
+                            return null;
+                          },
+                          decoration: InputDecoration(
+                            prefixIcon: Icon(Icons.star),
+                            border: OutlineInputBorder(),
+                            hintText: 'Enter the name of your note.',
+                            isDense: true,
+                            contentPadding: EdgeInsets.all(10),
+                          ),
+                        ),
+                        SizedBox(
+                          height: 16,
+                        ),
+                        TextFormField(
+                            controller: noteBodyController,
+                            validator: (value) {
+                              if (value.isEmpty) {
+                                return 'Please enter a body for your note.';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(Icons.note_add),
+                              border: OutlineInputBorder(),
+                              hintText: 'Write your note',
+                              isDense: true,
+                              contentPadding: EdgeInsets.all(10),
+                            ),
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            minLines: 4),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    height: 16,
+                  ),
+                  FlatButton(
+                    onPressed: () {
+                      if (_formKey.currentState.validate()) {
+                        notesBox.put(
+                            noteTitleController.text, noteBodyController.text);
+                        print(noteTitleController.text);
+                        if (widget.note != null &&
+                            noteTitleController.text !=
+                                widget.note.title.toString()) {
+                          notesBox.delete(widget.note.title.toString());
+                        }
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MyApp(),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                        color: Colors.green,
+                        width: 300,
+                        height: 100,
+                        child: Center(
+                            child: Text(
+                          'Save Note',
+                          style: TextStyle(fontSize: 25),
+                        ))),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ))));
+            )))));
   }
 }
