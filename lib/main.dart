@@ -12,6 +12,7 @@ void main() async {
     });
   }
   runApp(MaterialApp(
+    debugShowCheckedModeBanner: false,
     title: 'TC\'s Notes',
     home: MyApp(),
   ));
