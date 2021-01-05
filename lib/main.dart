@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:share/share.dart';
+import 'package:flutter/services.dart';
+import 'package:universal_io/io.dart';
 
 void main() async {
   await Hive.initFlutter();
@@ -64,6 +67,42 @@ class MyApp extends StatelessWidget {
                                       ViewNote(note: fullNote)));
                         },
                       ),
+                      actions: [
+                        IconSlideAction(
+                          caption: 'Share',
+                          color: Colors.yellow,
+                          icon: Icons.share,
+                          onTap: () {
+                            if (Platform.isAndroid || Platform.isIOS) {
+                              Share.share(
+                                  notesBox.keyAt(index).toString() +
+                                      '\n' +
+                                      notesBox
+                                          .get(notesBox.keyAt(index))
+                                          .toString(),
+                                  subject: notesBox.keyAt(index).toString());
+                            } else {
+                              Clipboard.setData(ClipboardData(
+                                  text: notesBox.keyAt(index).toString() +
+                                      '\n' +
+                                      notesBox
+                                          .get(notesBox.keyAt(index))
+                                          .toString()));
+                              final snackBar = SnackBar(
+                                content: Text('Note copied to clipboard'),
+                                action: SnackBarAction(
+                                  label: 'Undo',
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: ''));
+                                  },
+                                ),
+                              );
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(snackBar);
+                            }
+                          },
+                        )
+                      ],
                       secondaryActions: [
                         IconSlideAction(
                             caption: 'Edit',
@@ -145,6 +184,23 @@ class ViewNote extends StatelessWidget {
             ),
           );
           break;
+        case 'Share':
+          if (Platform.isAndroid || Platform.isIOS) {
+            Share.share(note.title + '\n' + note.body, subject: note.title);
+          } else {
+            Clipboard.setData(
+                ClipboardData(text: note.title + '\n' + note.body));
+            final snackBar = SnackBar(
+              content: Text('Note copied to clipboard'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: ''));
+                },
+              ),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(snackBar);
+          }
       }
     }
 
@@ -164,7 +220,7 @@ class ViewNote extends StatelessWidget {
                 PopupMenuButton<String>(
                   onSelected: handleClick,
                   itemBuilder: (BuildContext context) {
-                    return {'Edit', 'Delete'}.map((String choice) {
+                    return {'Edit', 'Delete', 'Share'}.map((String choice) {
                       return PopupMenuItem<String>(
                         value: choice,
                         child: Text(choice),

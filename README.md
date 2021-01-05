@@ -5,6 +5,7 @@ A small notes app built to learn Flutter.
 **Features**:
 
 * Add, view, edit, & delete notes.
+* Ability to share notes on Android/iOS (copy to clipboard on others).
 * Basic form validation.
 * Uses [Hive](https://docs.hivedb.dev/) for persistence.
 * Implements [flutter_slidable](https://pub.dev/packages/flutter_slidable) for list item actions.
