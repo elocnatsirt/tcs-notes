@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:share/share.dart';
 import 'package:flutter/services.dart';
 import 'package:universal_io/io.dart';
+import 'dart:io' show Platform;
 
 import 'data/hive_database.dart';
 import 'camera.dart';
@@ -78,8 +79,15 @@ class _NotesAppState extends State<NotesApp> {
                           icon: Icons.share,
                           onTap: () {
                             if (Platform.isAndroid || Platform.isIOS) {
-                              Share.share(note.title + '\n' + note.body,
-                                  subject: note.title);
+                              if (note.imageLocation != null &&
+                                  note.imageLocation != '') {
+                                Share.shareFiles([note.imageLocation],
+                                    text: note.title + '\n' + note.body,
+                                    subject: note.title);
+                              } else {
+                                Share.share(note.title + '\n' + note.body,
+                                    subject: note.title);
+                              }
                             } else {
                               Clipboard.setData(ClipboardData(
                                   text: note.title + '\n' + note.body));
@@ -160,7 +168,12 @@ class ViewNote extends StatelessWidget {
           break;
         case 'Share':
           if (Platform.isAndroid || Platform.isIOS) {
-            Share.share(note.title + '\n' + note.body, subject: note.title);
+            if (note.imageLocation != null && note.imageLocation != '') {
+              Share.shareFiles([note.imageLocation],
+                  text: note.title + '\n' + note.body, subject: note.title);
+            } else {
+              Share.share(note.title + '\n' + note.body, subject: note.title);
+            }
           } else {
             Clipboard.setData(
                 ClipboardData(text: note.title + '\n' + note.body));
@@ -198,12 +211,18 @@ class ViewNote extends StatelessWidget {
         body: SingleChildScrollView(
             child: Center(
                 child: Column(children: [
-          note.imageLocation == null || note.imageLocation == ''
+          note.imageLocation == null ||
+                  note.imageLocation == '' ||
+                  Platform.isWindows ||
+                  Platform.isFuchsia ||
+                  Platform.isMacOS
               ? SizedBox()
               : Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Image.file(
-                    File(note.imageLocation),
+                    Platform.isWindows || Platform.isFuchsia || Platform.isMacOS
+                        ? ''
+                        : File(note.imageLocation),
                     height: 500,
                   )),
           Padding(padding: EdgeInsets.all(15.0), child: Text(note.body)),
@@ -320,29 +339,33 @@ class ChangeNote extends State<NoteForm> {
                         maxLines: null,
                         keyboardType: TextInputType.multiline,
                         minLines: 4),
-                    RaisedButton(
-                      child: Text('Attach Picture'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        if (editing) {
-                          Navigator.pushNamed(context, '/camera', arguments: [
-                            Note(
-                                noteTitleController.text,
-                                noteBodyController.text,
-                                noteImageLocation.text),
-                            noteIndex,
-                            editing
-                          ]);
-                        } else {
-                          Navigator.pushNamed(context, '/camera', arguments: [
-                            Note(noteTitleController.text,
-                                noteBodyController.text, null),
-                            noteIndex,
-                            editing
-                          ]);
-                        }
-                      },
-                    )
+                    Platform.isWindows || Platform.isFuchsia || Platform.isMacOS
+                        ? SizedBox()
+                        : RaisedButton(
+                            child: Text('Take Picture'),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              if (editing) {
+                                Navigator.pushNamed(context, '/camera',
+                                    arguments: [
+                                      Note(
+                                          noteTitleController.text,
+                                          noteBodyController.text,
+                                          noteImageLocation.text),
+                                      noteIndex,
+                                      editing
+                                    ]);
+                              } else {
+                                Navigator.pushNamed(context, '/camera',
+                                    arguments: [
+                                      Note(noteTitleController.text,
+                                          noteBodyController.text, null),
+                                      noteIndex,
+                                      editing
+                                    ]);
+                              }
+                            },
+                          )
                   ],
                 ),
               ),
