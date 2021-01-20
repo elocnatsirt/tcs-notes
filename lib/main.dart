@@ -6,49 +6,56 @@ import 'package:share/share.dart';
 import 'package:flutter/services.dart';
 import 'package:universal_io/io.dart';
 
+import 'data/hive_database.dart';
+import 'camera.dart';
+
+const String notesBoxName = "notesBox";
+
 void main() async {
   await Hive.initFlutter();
-  var notesBox = await Hive.openBox('notesBox');
-  if (notesBox.length < 1) {
-    notesBox.putAll({
-      'My Note': 'This is my first note!',
-    });
-  }
+  Hive.registerAdapter(NoteAdapter());
+  await Hive.openBox<Note>(notesBoxName);
+
   runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'TC\'s Notes',
-    home: MyApp(),
+    initialRoute: '/notes',
+    routes: {
+      '/notes': (context) => NotesApp(),
+      '/notes/add': (context) => NoteForm(),
+      '/notes/edit': (context) => NoteForm(),
+      '/notes/view': (context) => ViewNote(),
+      '/camera': (context) => CameraWidget(),
+    },
   ));
 }
 
-class MyApp extends StatelessWidget {
-  final notesBox = Hive.box('notesBox');
+class NotesApp extends StatefulWidget {
+  @override
+  _NotesAppState createState() => _NotesAppState();
+}
+
+class _NotesAppState extends State<NotesApp> {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'TC\'s Notes',
-        home: WillPopScope(
-          onWillPop: () {
-            return Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MyApp(),
-              ),
-            );
-          },
-          child: Scaffold(
-            appBar: AppBar(
-              title: Text('TC\'s Notes'),
-            ),
-            body: Center(
-              child: ListView.builder(
-                  itemCount: notesBox.length,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('TC\'s Notes'),
+      ),
+      body: Center(
+        child: ValueListenableBuilder(
+            valueListenable: Hive.box<Note>(notesBoxName).listenable(),
+            builder: (context, Box<Note> box, _) {
+              if (box.isEmpty)
+                return Center(
+                  child: Text(
+                      "No notes saved.\nTap the floating button to add one!"),
+                );
+              return ListView.builder(
+                  itemCount: box.length,
                   itemBuilder: (context, index) {
-                    var fullNote = Note(notesBox.keyAt(index).toString(),
-                        notesBox.get(notesBox.keyAt(index)).toString());
-                    var previewText =
-                        notesBox.get(notesBox.keyAt(index)).toString();
+                    Note note = box.getAt(index);
+                    var previewText = note.body;
                     if (previewText.length > 25) {
                       previewText = previewText.replaceRange(
                           25, previewText.length, '...');
@@ -56,15 +63,12 @@ class MyApp extends StatelessWidget {
                     return Slidable(
                       actionPane: SlidableDrawerActionPane(),
                       child: ListTile(
-                        title: Text(notesBox.keyAt(index).toString()),
+                        title: Text(note.title),
                         subtitle: Text(previewText),
                         leading: Icon(Icons.note, size: 56),
                         onTap: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) =>
-                                      ViewNote(note: fullNote)));
+                          Navigator.pushNamed(context, '/notes/view',
+                              arguments: [note, index]);
                         },
                       ),
                       actions: [
@@ -74,20 +78,11 @@ class MyApp extends StatelessWidget {
                           icon: Icons.share,
                           onTap: () {
                             if (Platform.isAndroid || Platform.isIOS) {
-                              Share.share(
-                                  notesBox.keyAt(index).toString() +
-                                      '\n' +
-                                      notesBox
-                                          .get(notesBox.keyAt(index))
-                                          .toString(),
-                                  subject: notesBox.keyAt(index).toString());
+                              Share.share(note.title + '\n' + note.body,
+                                  subject: note.title);
                             } else {
                               Clipboard.setData(ClipboardData(
-                                  text: notesBox.keyAt(index).toString() +
-                                      '\n' +
-                                      notesBox
-                                          .get(notesBox.keyAt(index))
-                                          .toString()));
+                                  text: note.title + '\n' + note.body));
                               final snackBar = SnackBar(
                                 content: Text('Note copied to clipboard'),
                                 action: SnackBarAction(
@@ -110,12 +105,8 @@ class MyApp extends StatelessWidget {
                             icon: Icons.edit,
                             onTap: () {
                               print('editing list tile');
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        NoteForm(note: fullNote)),
-                              );
+                              Navigator.pushNamed(context, '/notes/edit',
+                                  arguments: [note, index, true]);
                             }),
                         IconSlideAction(
                             caption: 'Delete',
@@ -123,66 +114,49 @@ class MyApp extends StatelessWidget {
                             icon: Icons.delete,
                             onTap: () {
                               print('deleting list tile');
-                              notesBox.delete(notesBox.keyAt(index));
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => MyApp(),
-                                ),
-                              );
+                              box.delete(box.keyAt(index));
+                              Navigator.pushNamed(context, '/notes');
                             }),
                       ],
                     );
-                  }),
-            ),
-            floatingActionButton: FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => NoteForm()),
-                );
-              },
-              tooltip: 'Add Note',
-              label: Text('New Note'),
-              icon: Icon(Icons.note_add),
-            ),
-          ),
-        ));
+                  });
+            }),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.pushNamed(context, '/notes/add');
+        },
+        tooltip: 'Add Note',
+        label: Text('New Note'),
+        icon: Icon(Icons.note_add),
+      ),
+    );
   }
 }
 
-// View Note Widget
-
-class Note {
-  final String title;
-  final String body;
-
-  Note(this.title, this.body);
-}
-
 class ViewNote extends StatelessWidget {
-  final Note note;
-  ViewNote({Key key, @required this.note}) : super(key: key);
   @override
   Widget build(BuildContext context) {
+    final List args = ModalRoute.of(context).settings.arguments;
+    Note note;
+    int noteIndex;
+    if (args != null) {
+      note = args[0];
+      noteIndex = args[1];
+    }
+
     void handleClick(String value) {
       switch (value) {
         case 'Edit':
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => NoteForm(note: note)),
-          );
+          Navigator.pushNamed(context, "/notes/edit",
+              arguments: [note, noteIndex, true]);
           break;
         case 'Delete':
           print('deleting list tile');
           var notesBox = Hive.box('notesBox');
           notesBox.delete(note.title);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MyApp(),
-            ),
-          );
+          Navigator.pop(context);
+          Navigator.pushNamed(context, '/notes');
           break;
         case 'Share':
           if (Platform.isAndroid || Platform.isIOS) {
@@ -204,173 +178,208 @@ class ViewNote extends StatelessWidget {
       }
     }
 
-    return WillPopScope(
-        onWillPop: () {
-          return Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MyApp(),
+    return Scaffold(
+        appBar: AppBar(
+          title: Text(note.title),
+          actions: <Widget>[
+            PopupMenuButton<String>(
+              onSelected: handleClick,
+              itemBuilder: (BuildContext context) {
+                return {'Edit', 'Delete', 'Share'}.map((String choice) {
+                  return PopupMenuItem<String>(
+                    value: choice,
+                    child: Text(choice),
+                  );
+                }).toList();
+              },
             ),
-          );
-        },
-        child: Scaffold(
-            appBar: AppBar(
-              title: Text(note.title),
-              actions: <Widget>[
-                PopupMenuButton<String>(
-                  onSelected: handleClick,
-                  itemBuilder: (BuildContext context) {
-                    return {'Edit', 'Delete', 'Share'}.map((String choice) {
-                      return PopupMenuItem<String>(
-                        value: choice,
-                        child: Text(choice),
-                      );
-                    }).toList();
-                  },
-                ),
-              ],
-            ),
-            body: Text(note.body)));
+          ],
+        ),
+        body: SingleChildScrollView(
+            child: Center(
+                child: Column(children: [
+          note.imageLocation == null || note.imageLocation == ''
+              ? SizedBox()
+              : Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Image.file(
+                    File(note.imageLocation),
+                    height: 500,
+                  )),
+          Padding(padding: EdgeInsets.all(15.0), child: Text(note.body)),
+        ]))));
   }
 }
 
 // Add Note Form Widget
 class NoteForm extends StatefulWidget {
-  final Note note;
-  NoteForm({Key key, this.note}) : super(key: key);
   @override
-  AddNote createState() {
-    return AddNote();
+  ChangeNote createState() {
+    return ChangeNote();
   }
 }
 
-class AddNote extends State<NoteForm> {
+class ChangeNote extends State<NoteForm> {
   final _formKey = GlobalKey<FormState>();
   var noteTitleController = TextEditingController();
   var noteBodyController = TextEditingController();
-  final notesBox = Hive.box('notesBox');
+  var noteImageLocation = TextEditingController();
+  Box<Note> notesBox = Hive.box<Note>(notesBoxName);
   var pageTitle = Text("New Note");
+  bool editing = false;
 
   @override
   void dispose() {
     // Clean up the controller when the widget is disposed.
     noteTitleController.dispose();
     noteBodyController.dispose();
+    noteImageLocation.dispose();
     super.dispose();
   }
 
   Widget build(BuildContext context) {
-    if (widget.note != null) {
-      noteTitleController =
-          TextEditingController(text: widget.note.title.toString());
-      noteBodyController =
-          TextEditingController(text: widget.note.body.toString());
+    final List args = ModalRoute.of(context).settings.arguments;
+    Note note;
+    int noteIndex;
+
+    if (args != null) {
+      print('editing ' + args[1].toString());
+      note = args[0];
+      noteIndex = args[1];
+      if (args.length > 2) {
+        editing = args[2];
+      }
+    }
+
+    if (editing) {
       pageTitle = Text("Edit Note");
     }
-    return WillPopScope(
-        onWillPop: () {
-          return Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MyApp(),
-            ),
-          );
-        },
-        child: Scaffold(
-            appBar: AppBar(
-              title: pageTitle,
-            ),
-            body: Center(
+
+    if (note != null) {
+      noteTitleController = TextEditingController(text: note.title);
+      noteBodyController = TextEditingController(text: note.body);
+      noteImageLocation = TextEditingController(text: note.imageLocation);
+    }
+
+    return Scaffold(
+        appBar: AppBar(
+          title: pageTitle,
+        ),
+        body: SingleChildScrollView(
+            child: Center(
                 child: Container(
                     child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  Container(
-                    constraints: BoxConstraints(minWidth: 300, maxWidth: 960),
-                    width: MediaQuery.of(context).size.width * 0.8,
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: 16,
-                        ),
-                        TextFormField(
-                          controller: noteTitleController,
-                          validator: (value) {
-                            if (value.isEmpty) {
-                              return 'Please enter a name for your note.';
-                            } else if (widget.note == null &&
-                                notesBox.get(value) != null) {
-                              return 'A note with this name already exists!\nPlease rename your note.';
-                            }
-                            return null;
-                          },
-                          decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.star),
-                            border: OutlineInputBorder(),
-                            hintText: 'Enter the name of your note.',
-                            isDense: true,
-                            contentPadding: EdgeInsets.all(10),
-                          ),
-                        ),
-                        SizedBox(
-                          height: 16,
-                        ),
-                        TextFormField(
-                            controller: noteBodyController,
-                            validator: (value) {
-                              if (value.isEmpty) {
-                                return 'Please enter a body for your note.';
-                              }
-                              return null;
-                            },
-                            decoration: InputDecoration(
-                              prefixIcon: Icon(Icons.note_add),
-                              border: OutlineInputBorder(),
-                              hintText: 'Write your note',
-                              isDense: true,
-                              contentPadding: EdgeInsets.all(10),
-                            ),
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            minLines: 4),
-                      ],
+          key: _formKey,
+          child: Column(
+            children: [
+              Container(
+                constraints: BoxConstraints(minWidth: 300, maxWidth: 960),
+                width: MediaQuery.of(context).size.width * 0.8,
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 16,
                     ),
-                  ),
-                  SizedBox(
-                    height: 16,
-                  ),
-                  FlatButton(
-                    onPressed: () {
-                      if (_formKey.currentState.validate()) {
-                        notesBox.put(
-                            noteTitleController.text, noteBodyController.text);
-                        print(noteTitleController.text);
-                        if (widget.note != null &&
-                            noteTitleController.text !=
-                                widget.note.title.toString()) {
-                          notesBox.delete(widget.note.title.toString());
+                    TextFormField(
+                      controller: noteTitleController,
+                      validator: (value) {
+                        if (value.isEmpty) {
+                          return 'Please enter a name for your note.';
+                        } else if (note == null &&
+                            notesBox.get(value) != null) {
+                          return 'A note with this name already exists!\nPlease rename your note.';
                         }
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MyApp(),
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                        color: Colors.green,
-                        width: 300,
-                        height: 100,
-                        child: Center(
-                            child: Text(
-                          'Save Note',
-                          style: TextStyle(fontSize: 25),
-                        ))),
-                  ),
-                ],
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.star),
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter the name of your note.',
+                        isDense: true,
+                        contentPadding: EdgeInsets.all(10),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 16,
+                    ),
+                    TextFormField(
+                        controller: noteBodyController,
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return 'Please enter a body for your note.';
+                          }
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(Icons.note_add),
+                          border: OutlineInputBorder(),
+                          hintText: 'Write your note',
+                          isDense: true,
+                          contentPadding: EdgeInsets.all(10),
+                        ),
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        minLines: 4),
+                    RaisedButton(
+                      child: Text('Attach Picture'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (editing) {
+                          Navigator.pushNamed(context, '/camera', arguments: [
+                            Note(
+                                noteTitleController.text,
+                                noteBodyController.text,
+                                noteImageLocation.text),
+                            noteIndex,
+                            editing
+                          ]);
+                        } else {
+                          Navigator.pushNamed(context, '/camera', arguments: [
+                            Note(noteTitleController.text,
+                                noteBodyController.text, null),
+                            noteIndex,
+                            editing
+                          ]);
+                        }
+                      },
+                    )
+                  ],
+                ),
               ),
-            )))));
+              SizedBox(
+                height: 16,
+              ),
+              FlatButton(
+                onPressed: () {
+                  if (_formKey.currentState.validate()) {
+                    print('saving note with title ' + noteTitleController.text);
+                    note = Note(noteTitleController.text,
+                        noteBodyController.text, noteImageLocation.text);
+                    notesBox.add(note);
+                    if (noteIndex != null) {
+                      print('deleting note at ' + noteIndex.toString());
+                      try {
+                        notesBox.deleteAt(noteIndex);
+                      } catch (e) {
+                        print('Failed to delete old note. Error: ' + e);
+                      }
+                    }
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/notes');
+                  }
+                },
+                child: Container(
+                    color: Colors.green,
+                    width: 300,
+                    height: 100,
+                    child: Center(
+                        child: Text(
+                      'Save Note',
+                      style: TextStyle(fontSize: 25),
+                    ))),
+              ),
+            ],
+          ),
+        )))));
   }
 }
