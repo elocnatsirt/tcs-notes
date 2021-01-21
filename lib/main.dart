@@ -161,8 +161,8 @@ class ViewNote extends StatelessWidget {
           break;
         case 'Delete':
           print('deleting list tile');
-          var notesBox = Hive.box('notesBox');
-          notesBox.delete(note.title);
+          Box<Note> notesBox = Hive.box<Note>(notesBoxName);
+          notesBox.deleteAt(noteIndex);
           Navigator.pop(context);
           Navigator.pushNamed(context, '/notes');
           break;
@@ -378,17 +378,20 @@ class ChangeNote extends State<NoteForm> {
                     print('saving note with title ' + noteTitleController.text);
                     note = Note(noteTitleController.text,
                         noteBodyController.text, noteImageLocation.text);
-                    notesBox.add(note);
                     if (noteIndex != null) {
-                      print('deleting note at ' + noteIndex.toString());
+                      print('overwriting note at ' + noteIndex.toString());
                       try {
-                        notesBox.deleteAt(noteIndex);
+                        notesBox.putAt(noteIndex, note);
                       } catch (e) {
-                        print('Failed to delete old note. Error: ' + e);
+                        print('Failed to replace old note. Error: ' + e);
                       }
+                    } else {
+                      print('saving new note');
+                      notesBox.add(note);
                     }
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, '/notes');
+                    Navigator.pushNamedAndRemoveUntil(
+                        context, '/notes', (Route<dynamic> route) => false);
                   }
                 },
                 child: Container(

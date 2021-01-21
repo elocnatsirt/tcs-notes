@@ -2,9 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:path_provider/path_provider.dart';
-
-import 'main.dart';
 import 'data/hive_database.dart';
 
 List<CameraDescription> cameras;
@@ -242,10 +239,6 @@ class CameraState extends State<CameraWidget> {
     if (!controller.value.isInitialized) {
       return null;
     }
-    final Directory extDir = await getApplicationDocumentsDirectory();
-    final String dirPath = '${extDir.path}/Pictures/flutter_test';
-    await Directory(dirPath).create(recursive: true);
-    // final String filePath = '$dirPath/${timestamp()}.jpg';
 
     if (controller.value.isTakingPicture) {
       return null;
